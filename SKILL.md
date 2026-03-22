@@ -101,12 +101,45 @@ output/
    |------|----------|------|----------|
    | 1    | ...      | ...  | 3-5      |
    | 2    | ...      | ...  | 3-5      |
+
+   ## 解说配置（仅视频笔记）
+   - 音色：[待主人选择]
+   - 语气风格：[待主人选择]
+   - 语速倍率：[待主人选择，默认 1.5x]
    ```
 
 3. **提交方案给主人审批**
    - 将方案内容直接展示给主人
    - 使用 `AskQuestion` 确认：`审批通过 / 需要修改 / 更换主题`
    - 若需修改，根据反馈调整后重新提交
+
+4. **确认解说音色和语气（视频笔记时）**
+
+   使用 `AskQuestion` 让主人选择解说音色和语气风格：
+
+   **可选音色**（Qwen3-TTS）：
+   - Cherry — 年轻女声，活泼自然
+   - Serena — 成熟女声，知性温和
+   - Ethan — 年轻男声，阳光有力
+   - Chelsie — 甜美女声，亲和力强
+
+   **语气风格示例**：
+   - "语速快，语调活泼，像科技博主分享好物"
+   - "语速适中，语调沉稳专业，像新闻播报"
+   - "语速偏快，语调轻松有趣，像朋友聊天"
+
+   主人选择后，用 `--test 1` 生成一条样本音频让主人试听：
+   ```bash
+   python3 xiaohongshu-ai-notes/scripts/generate_narration.py \
+     --narration "output/[日期]_[主题名]/narration.json" \
+     --audio_dir "output/[日期]_[主题名]/audio_test/" \
+     --api_key $DASHSCOPE_API_KEY \
+     --voice Cherry \
+     --instructions "语速快，语调活泼" \
+     --speed 1.5 \
+     --test 1
+   ```
+   主人满意后再进入制作阶段；不满意则调整参数重新试听。
 
 ---
 
@@ -171,18 +204,23 @@ python3 xiaohongshu-ai-notes/scripts/render_slides.py \
 
 **Step 3：合成带解说视频**
 
-使用 `generate_narration.py`（基于 edge-tts + moviepy 2.x）一键生成：
+使用 `generate_narration.py`（基于 Qwen3-TTS + moviepy 2.x）一键生成，传入主人确认过的音色和语气参数：
 
 ```bash
 python3 xiaohongshu-ai-notes/scripts/generate_narration.py \
   --narration "output/[日期]_[主题名]/narration.json" \
   --slides_dir "output/[日期]_[主题名]/slides/" \
   --output "output/[日期]_[主题名]/video_narrated.mp4" \
-  --audio_dir "output/[日期]_[主题名]/audio/"
+  --audio_dir "output/[日期]_[主题名]/audio/" \
+  --api_key $DASHSCOPE_API_KEY \
+  --voice Cherry \
+  --instructions "主人选择的语气风格描述" \
+  --speed 1.5
 ```
 
 该脚本会自动：
-- 用 edge-tts 的 `zh-CN-XiaoxiaoNeural` 语音合成每段解说
+- 用 Qwen3-TTS 合成每段解说（音色和语气由主人选定）
+- 用 ffmpeg atempo 调整到指定倍速（默认 1.5x）
 - 每页幻灯片时长自动匹配解说长度 + 0.8秒间隔
 - 添加淡入淡出转场
 - 合成为最终 MP4 视频
@@ -237,7 +275,7 @@ python3 xiaohongshu-ai-notes/scripts/generate_slideshow.py \
 ## 技术说明
 
 - **幻灯片渲染**：使用 Pillow 纯 Python 绘制，不依赖浏览器或 Playwright。通过 `ImageDraw` 绘制渐变背景、圆角矩形卡片、SVG 风格图标和中文文字。
-- **语音合成**：使用 `edge-tts` 库调用微软 Edge TTS 服务，支持多种中文语音（默认 XiaoxiaoNeural），可调节语速。
+- **语音合成**：使用 Qwen3-TTS（DashScope API），模型 `qwen3-tts-instruct-flash`，支持指令控制语气风格。音色和语气由主人选择，用 `--test` 参数可快速生成单条样本试听。使用 ffmpeg `atempo` 滤镜调整倍速（默认 1.5x）。
 - **视频合成**：使用 MoviePy 2.x API（`from moviepy import ...`），支持 `CrossFadeIn`/`CrossFadeOut` 转场效果。注意 moviepy 2.x 不使用 `moviepy.editor` 子模块。
 - **字体加载**：macOS 下从 `/System/Library/Fonts` 加载系统字体，优先查找 `PingFang.ttc`；Linux 下查找 `NotoSansCJK`。
 
